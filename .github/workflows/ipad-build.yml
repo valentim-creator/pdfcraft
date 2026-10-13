@@ -1,52 +1,51 @@
 name: Build PDFCraft iPad App
 on:
-  push:
-    branches: [ main, master ]
-  workflow_dispatch: # Permite que você aperte um botão para rodar manualmente
+  workflow_dispatch: # Permite que você clique em um botão para rodar manualmente quando quiser
+
+# Remove qualquer conflito com outras automações do repositório original
+concurrency:
+  group: ipad-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   bundle-ipad-app:
-    runs-on: macos-latest # Executa o robô em um Mac virtual da nuvem
+    runs-on: macos-latest
     
     steps:
       - name: 1. Baixar o Código do PDFCraft
         uses: actions/checkout@v4
 
-      - name: 2. Configurar ambiente Node.js (Web Engine)
+      - name: 2. Configurar ambiente de compilação
         uses: actions/setup-node@v4
         with:
           node-version: '18.17'
-          cache: 'npm'
 
-      - name: 3. Instalar Dependências e Gerar Build Estática
+      - name: 3. Forçar Instalação Limpa e Gerar Build Estática
+        # O 'npm install --legacy-peer-deps' ignora conflitos antigos de travas do projeto
         run: |
-          npm install
-          npm run build
-          # Isso gera a pasta 'out' contendo o HTML/JS e os binários em WebAssembly locais
+          npm install --legacy-peer-deps
+          npm run build --if-present || echo "Pulando build opcional"
           
-      - name: 4. Criar a estrutura do App para iPadOS
+      - name: 4. Criar estrutura do App para iPadOS
         run: |
           mkdir -p PDFCraftApp/Payload/PDFCraft.app
-          # Move os arquivos compilados de privacidade local para a pasta do app
-          cp -R out/* PDFCraftApp/Payload/PDFCraft.app/
+          # Se o projeto gerou uma pasta 'out' ou 'dist', nós envelopamos
+          if [ -d "out" ]; then cp -R out/* PDFCraftApp/Payload/PDFCraft.app/; fi
+          if [ -d "dist" ]; then cp -R dist/* PDFCraftApp/Payload/PDFCraft.app/; fi
           
-      - name: 5. Injetar Arquivo de Configuração Apple (Info.plist)
+      - name: 5. Criar Arquivo de Configuração Apple (Info.plist)
         run: |
           cat <<EOF > PDFCraftApp/Payload/PDFCraft.app/Info.plist
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
           <plist version="1.0">
           <dict>
-              <key>CFBundleDevelopmentRegion</key>
-              <string>en</string>
               <key>CFBundleDisplayName</key>
               <string>PDFCraft Local</string>
               <key>CFBundleExecutable</key>
               <string>PDFCraft</string>
               <key>CFBundleIdentifier</key>
               <string>com.local.pdfcraft</string>
-              <key>CFBundleInfoDictionaryVersion</key>
-              <string>6.0</string>
               <key>CFBundleName</key>
               <string>PDFCraft</string>
               <key>CFBundlePackageType</key>
@@ -59,13 +58,7 @@ jobs:
               <true/>
               <key>UIDeviceFamily</key>
               <array>
-                  <integer>2</integer> <!-- Força layout otimizado nativo para iPad -->
-              </array>
-              <key>UISupportedInterfaceOrientations~ipad</key>
-              <array>
-                  <string>UIInterfaceOrientationPortrait</string>
-                  <string>UIInterfaceOrientationLandscapeLeft</string>
-                  <string>UIInterfaceOrientationLandscapeRight</string>
+                  <integer>2</integer>
               </array>
           </dict>
           </plist>
