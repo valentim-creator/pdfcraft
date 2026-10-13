@@ -20,7 +20,7 @@ jobs:
 
       - name: 3. Instalar Dependências e Gerar Build Estática
         run: |
-          npm ci
+          npm install
           npm run build
           # Isso gera a pasta 'out' contendo o HTML/JS e os binários em WebAssembly locais
           
