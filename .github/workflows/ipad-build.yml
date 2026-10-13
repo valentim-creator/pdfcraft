@@ -1,0 +1,83 @@
+name: Build PDFCraft iPad App
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Permite que você aperte um botão para rodar manualmente
+
+jobs:
+  bundle-ipad-app:
+    runs-on: macos-latest # Executa o robô em um Mac virtual da nuvem
+    
+    steps:
+      - name: 1. Baixar o Código do PDFCraft
+        uses: actions/checkout@v4
+
+      - name: 2. Configurar ambiente Node.js (Web Engine)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18.17'
+          cache: 'npm'
+
+      - name: 3. Instalar Dependências e Gerar Build Estática
+        run: |
+          npm ci
+          npm run build
+          # Isso gera a pasta 'out' contendo o HTML/JS e os binários em WebAssembly locais
+          
+      - name: 4. Criar a estrutura do App para iPadOS
+        run: |
+          mkdir -p PDFCraftApp/Payload/PDFCraft.app
+          # Move os arquivos compilados de privacidade local para a pasta do app
+          cp -R out/* PDFCraftApp/Payload/PDFCraft.app/
+          
+      - name: 5. Injetar Arquivo de Configuração Apple (Info.plist)
+        run: |
+          cat <<EOF > PDFCraftApp/Payload/PDFCraft.app/Info.plist
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://apple.com">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleDisplayName</key>
+              <string>PDFCraft Local</string>
+              <key>CFBundleExecutable</key>
+              <string>PDFCraft</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.local.pdfcraft</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>PDFCraft</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>UIDeviceFamily</key>
+              <array>
+                  <integer>2</integer> <!-- Força layout otimizado nativo para iPad -->
+              </array>
+              <key>UISupportedInterfaceOrientations~ipad</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+                  <string>UIInterfaceOrientationLandscapeLeft</string>
+                  <string>UIInterfaceOrientationLandscapeRight</string>
+              </array>
+          </dict>
+          </plist>
+          EOF
+
+      - name: 6. Compactar no formato de instalação (.IPA)
+        run: |
+          cd PDFCraftApp
+          zip -r ../PDFCraft_iPad_Local.ipa Payload
+          
+      - name: 7. Enviar o Aplicativo Pronto para Você Baixar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-application-package
+          path: PDFCraft_iPad_Local.ipa
